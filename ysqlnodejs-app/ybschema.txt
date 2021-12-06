@@ -1,0 +1,87 @@
+%flink.ssql(type=update)
+%flink.ssql(type=update)
+CREATE TABLE transactions (
+    `id` STRING,
+    `product` ROW<`product_name` STRING, `price` DECIMAL(38, 3)>,
+    `quantity` INT,
+    `eventtime` BIGINT,
+    `store` ROW<`store_id` INT, `city` STRING>,
+    `transaction_time` AS TO_TIMESTAMP_LTZ(eventtime, 3),
+    WATERMARK FOR transaction_time AS transaction_time - INTERVAL '3' SECOND
+)
+WITH (
+  'connector' = 'kinesis',
+  'stream' = 'mystream',
+  'aws.region' = 'eu-central-1',
+  'scan.stream.initpos' = 'LATEST',
+  'format' = 'json'
+);
+
+
+CREATE TABLE summary (
+    `window_start` TIMESTAMP(3) NOT NULL,
+    `window_end` TIMESTAMP(3) NOT NULL,
+    `store_id` INT,
+    `product_name` STRING,
+    `total_sale` DECIMAL(38, 3)
+)
+WITH (
+  'connector' = 'kinesis',
+  'stream' = 'ybsink',
+  'aws.region' = 'eu-central-1',
+  'scan.stream.initpos' = 'LATEST',
+  'format' = 'json'
+);
+
+CREATE TABLE kinesis.transactions (
+    id uuid PRIMARY KEY,
+    details jsonb
+) WITH default_time_to_live = 0
+    AND transactions = {'enabled': 'false'};
+
+CREATE TABLE summary (
+    window_start TIMESTAMP,
+    window_end TIMESTAMP,
+    store_id INT,
+    product_name TEXT,
+    total_sale DECIMAL(38, 3)
+)
+SELECT
+  window_start AS "time",
+  total_sale as "Store 1"
+FROM summary
+WHERE
+  $__timeFilter(window_start) and store_id = 1 and product_name is null
+ORDER BY 1,2
+limit 15
+
+
+aws cloudformation delete-stack --stack-name sam-app
+
+aws ssm put-parameter --name "yugabyte.host" --value "b1f12947-c61d-4753-8c15-159b9c5b231e.gcp.ybdb.io" --type String --tags "Key=app,Value=yugabyte"
+aws ssm put-parameter --name "yugabyte.root-crt" --value "$SSL_ROOT" --type String  --tags "Key=app,Value=yugabyte"  --tier Advanced
+export SSL_ROOT=`echo "$(cat root.crt )"`
+select `store.store_id`, `product.product_name`, `product.price` * sum(quantity) as total_sale
+from TABLE(
+   TUMBLE(TABLE transactions, DESCRIPTOR(transaction_time), INTERVAL '30' SECONDS));
+GROUP BY `store.store_id`, `product.product_name`, `product.price`;
+
+%flink.ssql(type=update)
+SELECT *
+  FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY window_start, window_end,store_id  ORDER BY total_sale) as rownum
+    FROM (
+        select window_start, window_end, window_time, store.store_id, product.product_name, sum(product.price * quantity) as total_sale
+        FROM TABLE(
+                TUMBLE(TABLE transactions, DESCRIPTOR(transaction_time), INTERVAL '30' SECONDS))
+        GROUP BY window_start, window_end, GROUPING SETS ((store.store_id, product.product_name), (product.product_name))
+    )
+ ) WHERE rownum <= 1;
+
+ {
+    "window_start": "2021-12-03 19:29:00",
+    "window_end": "2021-12-03 19:29:30",
+    "store_id": 2,
+    "product_name": "Intelligent Concrete Pants",
+    "total_sale": 21294
+}

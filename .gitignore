@@ -1,0 +1,4 @@
+.aws-sam
+.metals
+.vscode
+**/node_modules

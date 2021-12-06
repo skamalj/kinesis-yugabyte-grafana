@@ -1,0 +1,20 @@
+//Create YSQL table
+CREATE TABLE summary (
+    window_start TIMESTAMP,
+    window_end TIMESTAMP,
+    store_id INT,
+    product_name TEXT,
+    total_sale DECIMAL(38, 3)
+);
+
+// Create YCQL table 
+CREATE KEYSPACE kinesis;
+CREATE TABLE kinesis.transactions (
+    id uuid PRIMARY KEY,
+    details jsonb
+) WITH default_time_to_live = 0
+    AND transactions = {'enabled': 'false'};
+
+// Misc. commands
+// Set root cert for logging using YCQL
+export SSL_CERTFILE=/home/kamal/Downloads/root.crt    

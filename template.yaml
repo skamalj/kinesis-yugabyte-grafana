@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Resources:
+  YBSource:
+    Type: "AWS::Kinesis::Stream"
+    Properties:
+      ShardCount: 2
+      Name: ybsource
+  YBCQLRawConsumer:
+    Type: "AWS::Kinesis::StreamConsumer"
+    Properties:
+      StreamARN: !GetAtt YBSource.Arn
+      ConsumerName: "YBCQLRawConsumer"
+  YBSink:
+    Type: "AWS::Kinesis::Stream"
+    Properties:
+      ShardCount: 2
+      Name: ybsink
+  YBSQLSummaryConsumer:
+    Type: "AWS::Kinesis::StreamConsumer"
+    Properties:
+      StreamARN: !GetAtt YBSink.Arn
+      ConsumerName: "YBSQLSummaryConsumer"
+  YCQLNodeFunction: 
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: index.handler
+      CodeUri: ycqlnodejs-app/
+      FunctionName: pushrawtoyugabyte
+      PackageType: Zip
+      Runtime: nodejs14.x
+      Events:
+        KinesisEvent:
+          Type: Kinesis
+          Properties:
+            Stream: !GetAtt YBCQLRawConsumer.ConsumerARN
+            StartingPosition: TRIM_HORIZON
+            ParallelizationFactor: 2
+            BatchSize: 100
+            MaximumBatchingWindowInSeconds: 1
+            Enabled: true
+      Policies:
+      - Statement:
+        - Sid: SSMDescribeParametersPolicy
+          Effect: Allow
+          Action:
+          - ssm:DescribeParameters
+          Resource: '*'
+        - Sid: SSMGetParameterPolicy
+          Effect: Allow
+          Action:
+          - ssm:GetParameters
+          - ssm:GetParameter
+          Resource: '*'
+        - Sid: SSMReadKinesisPolicy
+          Effect: Allow
+          Resource: '*'
+          Action:        
+          - kinesis:DescribeStream
+          - kinesis:DescribeStreamSummary
+          - kinesis:GetRecords
+          - kinesis:GetShardIterator
+          - kinesis:ListShards
+          - kinesis:ListStreams
+          - kinesis:SubscribeToShard
+  YSQLNodeFunction: 
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: index.handler
+      CodeUri: ysqlnodejs-app/
+      FunctionName: pushsummarytoyugabyte
+      PackageType: Zip
+      Runtime: nodejs14.x
+      Events:
+        KinesisEvent:
+          Type: Kinesis
+          Properties:
+            Stream: !GetAtt YBSQLSummaryConsumer.ConsumerARN
+            StartingPosition: TRIM_HORIZON
+            ParallelizationFactor: 10
+            BatchSize: 50
+            MaximumBatchingWindowInSeconds: 5
+            Enabled: true
+      Policies:
+      - Statement:
+        - Sid: SSMDescribeParametersPolicy
+          Effect: Allow
+          Action:
+          - ssm:DescribeParameters
+          Resource: '*'
+        - Sid: SSMGetParameterPolicy
+          Effect: Allow
+          Action:
+          - ssm:GetParameters
+          - ssm:GetParameter
+          Resource: '*'
+        - Sid: SSMReadKinesisPolicy
+          Effect: Allow
+          Resource: '*'
+          Action:        
+          - kinesis:DescribeStream
+          - kinesis:DescribeStreamSummary
+          - kinesis:GetRecords
+          - kinesis:GetShardIterator
+          - kinesis:ListShards
+          - kinesis:ListStreams
+          - kinesis:SubscribeToShard          
+
+  

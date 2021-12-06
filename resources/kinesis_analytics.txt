@@ -1,0 +1,41 @@
+%flink.ssql(type=update)
+CREATE TABLE  IF NOT EXISTS transactions (
+    `id` STRING,
+    `product` ROW<`product_name` STRING, `price` DECIMAL(38, 3)>,
+    `quantity` INT,
+    `eventtime` BIGINT,
+    `store` ROW<`store_id` INT, `city` STRING>,
+    `transaction_time` AS TO_TIMESTAMP_LTZ(eventtime, 3),
+    WATERMARK FOR transaction_time AS transaction_time - INTERVAL '10' SECOND
+)
+WITH (
+  'connector' = 'kinesis',
+  'stream' = 'ybsource',
+  'aws.region' = 'eu-central-1',
+  'scan.stream.initpos' = 'LATEST',
+  'format' = 'json'
+);
+
+
+CREATE TABLE  IF NOT EXISTS summary (
+    `window_start` TIMESTAMP(3) NOT NULL,
+    `window_end` TIMESTAMP(3) NOT NULL,
+    `store_id` INT,
+    `product_name` STRING,
+    `total_sale` DECIMAL(38, 3)
+)
+WITH (
+  'connector' = 'kinesis',
+  'stream' = 'ybsink',
+  'aws.region' = 'eu-central-1',
+  'scan.stream.initpos' = 'LATEST',
+  'format' = 'json'
+);
+
+CREATE VIEW  IF NOT EXISTS v_summary AS
+SELECT window_start, window_end, store.store_id, product.product_name, sum(product.price * quantity) as total_sale
+FROM TABLE(
+    TUMBLE(TABLE transactions, DESCRIPTOR(transaction_time), INTERVAL '30' SECONDS))
+GROUP BY window_start, window_end, ROLLUP (store.store_id, product.product_name);
+
+insert into summary select * from v_summary;

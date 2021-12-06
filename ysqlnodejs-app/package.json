@@ -1,0 +1,15 @@
+{
+  "name": "ycqlnodejs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.43.0",
+    "pg": "^8.7.1"
+  }
+}
