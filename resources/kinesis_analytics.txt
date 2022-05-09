@@ -11,7 +11,7 @@ CREATE TABLE  IF NOT EXISTS transactions (
 WITH (
   'connector' = 'kinesis',
   'stream' = 'ybsource',
-  'aws.region' = 'eu-central-1',
+  'aws.region' = <Your aws region Ex. 'eu-central-1'>,
   'scan.stream.initpos' = 'LATEST',
   'format' = 'json'
 );
@@ -27,7 +27,7 @@ CREATE TABLE  IF NOT EXISTS summary (
 WITH (
   'connector' = 'kinesis',
   'stream' = 'ybsink',
-  'aws.region' = 'eu-central-1',
+  'aws.region' = <Your aws region Ex. 'eu-central-1'>,
   'scan.stream.initpos' = 'LATEST',
   'format' = 'json'
 );

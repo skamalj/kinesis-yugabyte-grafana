@@ -19,6 +19,7 @@ aws ssm put-parameter --name "yugabyte.admin-user" --value "admin" --type String
 ```
 * Use parameter name yugabyte.admin-password  for password
 * yugabyte.host for host
+* yugabyte.region for region (cloud region where you created database)
 * yugabyte.root-crt for root certificate(commands below)
 
 These are the parameter names used by lambda functions. If you decide to change the names, then change them in Lambda code as well.
@@ -32,7 +33,8 @@ aws ssm put-parameter --name "yugabyte.root-crt" --value "$SSL_ROOT" --type Stri
 ## Kinesis Analytics
 Create studio application and open it in zeppelin. I had used scaling configuration as Parallelism = 8 and Parallelism Per KPU = 2
 
-The code is available in "resources/kinesis_analytics.txt". Copy this content to studio note.
+The code is available in "resources/kinesis_analytics.txt". Copy this content to studio note.   
+Make sure to update **aws.region** in the queries
 
 ## Deploy Lambda and Streams
 Use below commands to deploy Lambda and Streams (from root directory)
@@ -53,3 +55,6 @@ Kinesis configuration is explained in Readme for datagenerator sample.env file.
 ```
 npm start -- -i 5
 ```
+
+## Grafana
+Before importing dashboard json (resources/grafana.json) make sure you create datasource named **PostgreSQL**

@@ -26,19 +26,24 @@ async function connectDB(){
     command = new GetParameterCommand({ Name: "yugabyte.host" });
     var ybHost= ssmClient.send(command)
 
-    var conn_params = await Promise.all([ybRootCrt, ybAdminUser, ybAdminPassword, ybHost])
+    command = new GetParameterCommand({ Name: "yugabyte.region" });
+    var ybRegion= ssmClient.send(command)
+
+
+    var conn_params = await Promise.all([ybRootCrt, ybAdminUser, ybAdminPassword, ybHost, ybRegion])
     .then(function(values) {
         const crt = values[0].Parameter.Value;
         const user = values[1].Parameter.Value;
         const password = values[2].Parameter.Value;
         const host= values[3].Parameter.Value;
-        return [crt,user,password,host];
+        const region= values[4].Parameter.Value;
+        return [crt,user,password,host,region];
     });
 
     
     client = new cassandra.Client({
         contactPoints: [conn_params[3]],
-        localDataCenter: 'eu-central-1',
+        localDataCenter: conn_params[4],
         credentials: { username: conn_params[1], password: conn_params[2] },
         keyspace: 'kinesis',
         sslOptions: { ca: conn_params[0] }
